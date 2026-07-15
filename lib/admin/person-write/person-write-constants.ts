@@ -1,0 +1,26 @@
+export const PERSON_ID_PREFIX = 'person-'
+
+export const PRISMA_CONTACT_CHANNEL = {
+  WEBSITE_FORM: 'WEBSITE_FORM',
+  EMAIL: 'EMAIL',
+  PHONE: 'PHONE',
+  WALK_IN: 'WALK_IN',
+  SHELTER_EVENT: 'SHELTER_EVENT',
+  ADMIN_CREATED: 'ADMIN_CREATED',
+  INTERNAL: 'INTERNAL',
+} as const
+
+export const PRISMA_PERSON_PROFILE_TYPE = {
+  ADOPTER: 'ADOPTER',
+  FOSTER: 'FOSTER',
+  VOLUNTEER: 'VOLUNTEER',
+  DONOR: 'DONOR',
+  SUPPORTER: 'SUPPORTER',
+  GENERAL_CONTACT: 'GENERAL_CONTACT',
+} as const
+
+export type PrismaContactChannelValue =
+  (typeof PRISMA_CONTACT_CHANNEL)[keyof typeof PRISMA_CONTACT_CHANNEL]
+
+export type PrismaPersonProfileTypeValue =
+  (typeof PRISMA_PERSON_PROFILE_TYPE)[keyof typeof PRISMA_PERSON_PROFILE_TYPE]

@@ -1,0 +1,50 @@
+
+export type CaseType =
+  | 'general_question'
+  | 'pet_question'
+  | 'adoption_application'
+  | 'virtual_adoption'
+  | 'donation_support'
+  | 'volunteer_application'
+  | 'event_followup'
+  | 'surrender_request'
+  | 'lost_and_found'
+  | 'medical_update'
+  | 'other'
+  | 'question'
+  | 'adoption_interest'
+  | 'donation'
+  | 'volunteer'
+  | 'general'
+
+export type CaseScope = 'pet_related' | 'general'
+
+export type CaseStatus =
+  | 'new'
+  | 'open'
+  | 'waiting_on_contact'
+  | 'waiting_on_staff'
+  | 'screening'
+  | 'scheduled'
+  | 'approved'
+  | 'declined'
+  | 'completed'
+  | 'closed'
+  | 'cancelled'
+  | 'waiting_reply'
+  | 'in_review'
+  | 'rejected'
+  | 'no_response'
+
+export type CasePriority = 'low' | 'medium' | 'high'
+
+export type ContactChannel =
+  | 'website_form'
+  | 'email'
+  | 'phone'
+  | 'walk_in'
+  | 'shelter_event'
+  | 'admin_created'
+  | 'internal'
+  | 'in_person'
+

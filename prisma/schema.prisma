@@ -1,0 +1,681 @@
+// Prisma bootstrap draft: dependencies/config are prepared, but the app runtime is not wired to Prisma yet.
+// Goal: model the full Furever Home app before Prisma/Aiven/GraphQL integration.
+// Scope notes:
+// - Pets are the shared source of truth between admin and public pages.
+// - Stripe donations are public-only for the demo and are not written into admin CRM yet.
+// - Sender.com/email/form intake is not auto-ingested into admin CRM in the demo.
+// - Admin staff can manually create cases from emails, calls, forms, and external events.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum StaffRole {
+  ADMIN
+  CASE_MANAGER
+  VOLUNTEER_COORDINATOR
+  VIEWER
+}
+
+enum PetStatus {
+  AVAILABLE
+  NEW
+  RESERVED
+  ADOPTION_IN_PROGRESS
+  ADOPTED
+  UNAVAILABLE
+  HIDDEN
+}
+
+enum PetPublicStatus {
+  PUBLISHED
+  DRAFT
+  HIDDEN
+  RESERVED
+  ADOPTED
+}
+
+enum CaseType {
+  GENERAL_QUESTION
+  PET_QUESTION
+  ADOPTION_APPLICATION
+  VIRTUAL_ADOPTION
+  DONATION_SUPPORT
+  VOLUNTEER_APPLICATION
+  EVENT_FOLLOWUP
+  SURRENDER_REQUEST
+  LOST_AND_FOUND
+  MEDICAL_UPDATE
+  OTHER
+}
+
+enum CaseScope {
+  PET_RELATED
+  GENERAL
+}
+
+enum CaseStatus {
+  NEW
+  OPEN
+  WAITING_ON_CONTACT
+  WAITING_ON_STAFF
+  SCREENING
+  SCHEDULED
+  APPROVED
+  DECLINED
+  COMPLETED
+  CLOSED
+  CANCELLED
+  REJECTED
+  NO_RESPONSE
+}
+
+enum CasePriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ContactChannel {
+  WEBSITE_FORM
+  EMAIL
+  PHONE
+  WALK_IN
+  SHELTER_EVENT
+  ADMIN_CREATED
+  INTERNAL
+}
+
+enum CaseInteractionDirection {
+  INBOUND
+  OUTBOUND
+  INTERNAL
+}
+
+enum CaseInteractionReferenceSystem {
+  EMAIL_CLIENT
+  CALL_RECORDING
+  WEBSITE
+  MANUAL
+  EVENT_SIGNUP
+  STRIPE
+  SENDER_COM
+}
+
+enum CaseInteractionReferenceType {
+  EMAIL
+  CALL
+  FORM_SUBMISSION
+  CONVERSATION
+  MANUAL_NOTE
+  PAYMENT
+  SUBSCRIBER_EVENT
+}
+
+enum CaseEventActorType {
+  SYSTEM
+  STAFF
+  CONTACT
+  APPLICANT
+  VOLUNTEER
+  DONOR
+}
+
+enum PersonProfileType {
+  ADOPTER
+  FOSTER
+  VOLUNTEER
+  DONOR
+  SUPPORTER
+  GENERAL_CONTACT
+}
+
+enum LandlordApprovalStatus {
+  NOT_NEEDED
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum ExperienceLevel {
+  FIRST_TIME
+  SOME_EXPERIENCE
+  EXPERIENCED
+}
+
+enum VirtualAdoptionStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  COMPLETED
+}
+
+enum PaymentFrequency {
+  ONE_TIME
+  MONTHLY
+  QUARTERLY
+  ANNUAL
+}
+
+enum DonationInquiryType {
+  RECEIPT_REQUEST
+  MONTHLY_DONATION_CHANGE
+  CORPORATE_DONATION
+  REFUND_OR_CORRECTION
+  ALLOCATION_QUESTION
+  EVENT_SPONSORSHIP
+  OTHER
+}
+
+enum VolunteerApplicationStatus {
+  NEW
+  SCREENING
+  ORIENTATION_SCHEDULED
+  APPROVED
+  DECLINED
+  ACTIVE
+  INACTIVE
+}
+
+enum BackgroundCheckStatus {
+  NOT_REQUIRED
+  PENDING
+  CLEARED
+  FAILED
+}
+
+model StaffUser {
+  id             String     @id
+  name           String
+  email          String     @unique
+  emailVerified  DateTime?
+  image          String?
+  role           StaffRole  @default(CASE_MANAGER)
+  active         Boolean    @default(true)
+  passwordHash   String?
+  lastSignedInAt DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  accounts           Account[]
+  sessions           Session[]
+  assignedCases      ShelterCase[]     @relation("AssignedCaseStaff")
+  caseNotes          CaseNote[]
+  loggedInteractions CaseInteraction[] @relation("InteractionLoggedBy")
+  authoredCaseEvents CaseEvent[]       @relation("CaseEventActor")
+  activityEvents     ActivityEvent[]   @relation("ActivityActor")
+  petStatusEvents    PetStatusEvent[]
+  volunteerHours     VolunteerHours[]
+
+  @@index([active])
+  @@index([role])
+}
+
+model Account {
+  id                String  @id
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user StaffUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user StaffUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Person {
+  id                     String             @id
+  name                   String
+  email                  String?
+  phone                  String?
+  addressLine1           String?
+  addressLine2           String?
+  city                   String?
+  state                  String?
+  zip                    String?
+  country                String?
+  preferredContactMethod ContactChannel?
+  profileType            PersonProfileType?
+  householdType          String?
+  hasOtherPets           Boolean?
+  interestAreas          String[]           @default([])
+  tags                   String[]           @default([])
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  cases                 ShelterCase[]
+  caseInteractions      CaseInteraction[]
+  adoptionApplications  AdoptionApplication[]
+  virtualAdoptions      VirtualAdoption[]
+  donationInquiries     DonationInquiry[]
+  volunteerApplications VolunteerApplication[]
+  volunteerHours        VolunteerHours[]
+  activityEvents        ActivityEvent[]
+
+  @@index([name])
+  @@index([email])
+  @@index([phone])
+  @@index([profileType])
+}
+
+model Pet {
+  id                   String          @id
+  publicSlug           String          @unique
+  name                 String
+  species              String
+  description          String
+  age                  Int
+  gender               String
+  weight               Float
+  status               PetStatus       @default(AVAILABLE)
+  publicStatus         PetPublicStatus @default(PUBLISHED)
+  isPublished          Boolean         @default(true)
+  featured             Boolean         @default(false)
+  size                 String?
+  neutered             Boolean?
+  goodWithChildren     Boolean?
+  goodWithOtherAnimals Boolean?
+  ageGroup             String?
+  daysInShelter        Int?
+  publishedAt          DateTime?
+  hiddenAt             DateTime?
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+
+  images                PetImage[]
+  cases                 ShelterCase[]
+  adoptionApplications  AdoptionApplication[]
+  virtualAdoptions      VirtualAdoption[]
+  petStatusEvents       PetStatusEvent[]
+  activityEvents        ActivityEvent[]
+
+  @@index([species])
+  @@index([status])
+  @@index([publicStatus])
+  @@index([isPublished, publicStatus, status])
+}
+
+model PetImage {
+  id                 String   @id
+  petId              String
+  cloudinaryPublicId String
+  secureUrl          String
+  thumbnailUrl       String?
+  alt                String?
+  width              Int?
+  height             Int?
+  format             String?
+  bytes              Int?
+  sortOrder          Int      @default(0)
+  isPrimary          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@unique([petId, cloudinaryPublicId])
+  @@index([petId, isPrimary])
+  @@index([petId, sortOrder])
+}
+
+model ShelterEvent {
+  id        String   @id
+  name      String
+  type      String
+  date      DateTime
+  location  String?
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cases ShelterCase[]
+}
+
+model ShelterCase {
+  id                 String       @id
+  caseNumber         String?      @unique
+  type               CaseType
+  scope              CaseScope
+  status             CaseStatus   @default(NEW)
+  priority           CasePriority @default(MEDIUM)
+  source             ContactChannel?
+  personId           String
+  petId              String?
+  relatedEventId     String?
+  relatedDonationId  String?
+  subject            String
+  summary            String?
+  assignedStaffId    String?
+  outcome            String?
+  nextFollowUpAt     DateTime?
+  nextFollowUpNote   String?
+  tags               String[]     @default([])
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  closedAt           DateTime?
+
+  person               Person               @relation(fields: [personId], references: [id])
+  pet                  Pet?                 @relation(fields: [petId], references: [id])
+  relatedEvent         ShelterEvent?        @relation(fields: [relatedEventId], references: [id])
+  assignedStaff        StaffUser?           @relation("AssignedCaseStaff", fields: [assignedStaffId], references: [id])
+  interactions         CaseInteraction[]
+  notes                CaseNote[]
+  events               CaseEvent[]
+  adoptionApplication  AdoptionApplication?
+  virtualAdoption      VirtualAdoption?
+  donationInquiry      DonationInquiry?
+  volunteerApplication VolunteerApplication?
+  activityEvents       ActivityEvent[]
+  petStatusEvents      PetStatusEvent[]
+  volunteerHours       VolunteerHours[]
+
+  @@index([status])
+  @@index([type])
+  @@index([priority])
+  @@index([personId])
+  @@index([petId])
+  @@index([assignedStaffId])
+  @@index([nextFollowUpAt])
+  @@index([createdAt])
+}
+
+model CaseInteraction {
+  id              String                       @id
+  caseId          String
+  channel         ContactChannel
+  direction       CaseInteractionDirection
+  occurredAt      DateTime
+  loggedAt        DateTime                     @default(now())
+  loggedByStaffId String?
+  contactPersonId String?
+  contactPoint    String?
+  referenceSystem CaseInteractionReferenceSystem?
+  referenceType   CaseInteractionReferenceType?
+  reference       String?
+  summary         String
+  actionTaken     String?
+  nextStep        String?
+  visibility      String                       @default("internal")
+
+  case          ShelterCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  loggedByStaff StaffUser?  @relation("InteractionLoggedBy", fields: [loggedByStaffId], references: [id])
+  contactPerson Person?     @relation(fields: [contactPersonId], references: [id])
+
+  @@index([caseId])
+  @@index([loggedAt])
+  @@index([loggedByStaffId])
+  @@index([contactPersonId])
+}
+
+model CaseNote {
+  id         String   @id
+  caseId     String
+  staffId    String?
+  body       String
+  tags       String[] @default([])
+  visibility String   @default("internal")
+  createdAt  DateTime @default(now())
+
+  case  ShelterCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  staff StaffUser?  @relation(fields: [staffId], references: [id])
+
+  @@index([caseId])
+  @@index([staffId])
+  @@index([createdAt])
+}
+
+model CaseEvent {
+  id        String              @id
+  caseId    String
+  type      String
+  title     String
+  detail    String?
+  createdAt DateTime            @default(now())
+  actorType CaseEventActorType?
+  actorId   String?
+  actorName String?
+  actorRole String?
+
+  case  ShelterCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  actor StaffUser?  @relation("CaseEventActor", fields: [actorId], references: [id])
+
+  @@index([caseId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([actorId])
+}
+
+model AdoptionApplication {
+  id                  String                  @id
+  caseId              String                  @unique
+  personId            String
+  petId               String
+  sourceApplicationId String?
+  status              CaseStatus
+  householdType       String?
+  hasOtherPets        Boolean?
+  hasChildren         Boolean?
+  housingType         String?
+  landlordApproval    LandlordApprovalStatus?
+  experienceLevel     ExperienceLevel?
+  score               Int?
+  screeningNote       String?
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  case   ShelterCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  person Person      @relation(fields: [personId], references: [id])
+  pet    Pet         @relation(fields: [petId], references: [id])
+
+  @@index([personId])
+  @@index([petId])
+  @@index([status])
+}
+
+model VirtualAdoption {
+  id                     String                @id
+  caseId                 String                @unique
+  personId               String
+  petId                  String
+  status                 VirtualAdoptionStatus @default(ACTIVE)
+  frequency              PaymentFrequency
+  amount                 Decimal?              @db.Decimal(10, 2)
+  currency               String?               @default("USD")
+  sponsorUpdateRequested Boolean               @default(false)
+  certificateSent        Boolean               @default(false)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
+
+  case   ShelterCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  person Person      @relation(fields: [personId], references: [id])
+  pet    Pet         @relation(fields: [petId], references: [id])
+
+  @@index([personId])
+  @@index([petId])
+  @@index([status])
+}
+
+model DonationInquiry {
+  id               String              @id
+  caseId           String              @unique
+  personId         String
+  externalDonationId String?
+  inquiryType      DonationInquiryType
+  status           CaseStatus
+  amount           Decimal?            @db.Decimal(10, 2)
+  currency         String?             @default("USD")
+  frequency        PaymentFrequency?
+  receiptRequested Boolean             @default(false)
+  thankYouSent     Boolean             @default(false)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  case   ShelterCase @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  person Person      @relation(fields: [personId], references: [id])
+
+  @@index([personId])
+  @@index([status])
+}
+
+model VolunteerApplication {
+  id                     String                     @id
+  caseId                 String                     @unique
+  personId               String
+  status                 VolunteerApplicationStatus @default(NEW)
+  interestAreas          String[]                   @default([])
+  availability           String?
+  experience             String?
+  backgroundCheckStatus  BackgroundCheckStatus?
+  orientationScheduledAt DateTime?
+  orientationCompleted   Boolean                    @default(false)
+  assignedRole           String?
+  createdAt              DateTime                   @default(now())
+  updatedAt              DateTime                   @updatedAt
+
+  case           ShelterCase     @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  person         Person          @relation(fields: [personId], references: [id])
+  volunteerHours VolunteerHours[]
+
+  @@index([personId])
+  @@index([status])
+}
+
+model VolunteerHours {
+  id                     String   @id
+  personId               String
+  volunteerApplicationId String?
+  caseId                 String?
+  date                   DateTime
+  hours                  Float
+  activity               String
+  role                   String?
+  staffId                String?
+  createdAt              DateTime @default(now())
+
+  person               Person                @relation(fields: [personId], references: [id])
+  volunteerApplication VolunteerApplication? @relation(fields: [volunteerApplicationId], references: [id])
+  case                 ShelterCase?          @relation(fields: [caseId], references: [id])
+  staff                StaffUser?            @relation(fields: [staffId], references: [id])
+
+  @@index([personId])
+  @@index([volunteerApplicationId])
+  @@index([caseId])
+  @@index([date])
+}
+
+model ActivityEvent {
+  id        String   @id
+  type      String
+  title     String
+  detail    String
+  createdAt DateTime @default(now())
+  petId     String?
+  caseId    String?
+  personId  String?
+  actorId   String?
+  actorName String?
+  actorRole String?
+
+  pet    Pet?         @relation(fields: [petId], references: [id])
+  case   ShelterCase? @relation(fields: [caseId], references: [id])
+  person Person?      @relation(fields: [personId], references: [id])
+  actor  StaffUser?   @relation("ActivityActor", fields: [actorId], references: [id])
+
+  @@index([type])
+  @@index([createdAt])
+  @@index([petId])
+  @@index([caseId])
+  @@index([personId])
+  @@index([actorId])
+}
+
+model PetStatusEvent {
+  id         String    @id
+  petId      String
+  fromStatus PetStatus?
+  toStatus   PetStatus
+  date       DateTime
+  createdAt  DateTime  @default(now())
+  caseId     String?
+  staffId    String?
+
+  pet   Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  case  ShelterCase? @relation(fields: [caseId], references: [id])
+  staff StaffUser?   @relation(fields: [staffId], references: [id])
+
+  @@index([petId])
+  @@index([caseId])
+  @@index([staffId])
+  @@index([createdAt])
+}
+
+model DashboardAnalyticsRecord {
+  id         String   @id
+  collection String
+  recordKey  String
+  date       String?
+  month      String?
+  data       Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([collection, recordKey])
+  @@index([collection])
+  @@index([collection, date])
+  @@index([collection, month])
+}
+
+model ApiRateLimit {
+  id          String   @id @default(cuid())
+  scope       String
+  keyHash     String
+  windowStart DateTime
+  expiresAt   DateTime
+  count       Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([scope, keyHash, windowStart])
+  @@index([expiresAt])
+}
+
+model DemoDateShiftRun {
+  id          String   @id @default(cuid())
+  runDate     DateTime @unique @db.Date
+  shiftedDays Int      @default(1)
+  shiftedRows Int
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

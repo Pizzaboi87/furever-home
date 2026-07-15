@@ -1,0 +1,36 @@
+# v0 sandbox internal files
+__v0_runtime_loader.js
+__v0_devtools.tsx
+__v0_jsx-dev-runtime.ts
+.snowflake/
+.v0-trash/
+.vercel/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+!.env.playwright.example
+
+# Dependencies and framework output
+node_modules/
+.next/
+out/
+build/
+
+# Playwright output and authenticated browser state
+playwright/.auth/
+playwright-report/
+test-results/
+blob-report/
+
+# Test and compiler output
+coverage/
+tsconfig.tsbuildinfo
+
+# macOS metadata
+.DS_Store
+__MACOSX/
+
+# zip files
+*.zip
