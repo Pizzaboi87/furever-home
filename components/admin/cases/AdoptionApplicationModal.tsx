@@ -116,7 +116,7 @@ const AdoptionApplicationModal = ({
                         </select>
                     </FormField>
 
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-2 mt-4">
                         <FormField label="Screening score">
                             <input
                                 type="number"
@@ -195,7 +195,7 @@ const AdoptionApplicationModal = ({
                         </select>
                     </FormField>
 
-                    <div className="grid gap-3 rounded-lg border border-border bg-muted/30 p-4 sm:grid-cols-2">
+                    <div className="grid gap-3 rounded-xl border border-border bg-muted/30 p-4 sm:grid-cols-2 mt-2">
                         <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-foreground">
                             <input
                                 type="checkbox"
