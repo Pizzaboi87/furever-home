@@ -19,6 +19,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  verification: {
+    google: 'LnwJ0B5g0pcW2EikAeL8_zVhU282OWaWmh77jd0L7XA',
+  },
   title: {
     default: 'Furever Home | Pet Adoption and Animal Shelter',
     template: `%s | ${SITE_NAME}`,
